@@ -129,7 +129,9 @@ def adzuna_search(what: str, page: int = 1) -> list[dict]:
 def passes_filters(job: dict) -> bool:
     title = job.get("title", "")
     description = job.get("description", "")
-    location = (job.get("location") or {}).get("display_name", "")
+    location_obj = job.get("location") or {}
+    location = location_obj.get("display_name", "")
+    location_area = location_obj.get("area", [])
 
     if EXCLUDE_PATTERN.search(title):
         return False
@@ -147,11 +149,20 @@ def passes_filters(job: dict) -> bool:
         return False
 
     is_portland = bool(PORTLAND_METRO_PATTERN.search(location))
+
+    # Adzuna often represents remote/nationwide roles by just leaving the
+    # location vague (e.g. display_name "US" with a single-element area
+    # list) rather than literally writing "Remote" anywhere. Treat a
+    # country-level-only location as a remote signal too, in addition to
+    # the literal word "remote" appearing in title/location/description.
+    is_vague_nationwide_location = len(location_area) <= 1
     is_remote = bool(
         REMOTE_PATTERN.search(title)
         or REMOTE_PATTERN.search(location)
         or REMOTE_PATTERN.search(description[:500])
+        or is_vague_nationwide_location
     )
+
     return is_portland or is_remote
 
 
