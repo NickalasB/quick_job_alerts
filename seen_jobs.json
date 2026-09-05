@@ -1,11 +1,37 @@
 {
   "uids": [
-    "5871241306",
-    "adzuna:5871235305",
-    "5871235305",
-    "adzuna:5871241287",
+    "ashby:openai:None",
+    "greenhouse:coinbase:8051630",
+    "5871241287",
     "adzuna:5871241306",
-    "5871241287"
+    "greenhouse:coinbase:8106071",
+    "greenhouse:coinbase:8017697",
+    "adzuna:5871235305",
+    "adzuna:5871241287",
+    "greenhouse:stripe:7942216",
+    "5871235305",
+    "greenhouse:coinbase:8064788",
+    "ashby:linear:None",
+    "ashby:plaid:None",
+    "ashby:notion:None",
+    "greenhouse:databricks:7295190002",
+    "5871241306",
+    "greenhouse:affirm:7895270003",
+    "greenhouse:coinbase:8050322",
+    "ashby:ramp:None"
   ],
-  "fingerprints": []
+  "fingerprints": [
+    "ramp:seniorrecruiterga",
+    "affirm:seniormanagertechnicalrecruiting",
+    "notion:gtmrecruitertokyo",
+    "plaid:productsourcer",
+    "coinbase:seniormanagerrecruiting",
+    "databricks:universityrecruitercontract",
+    "stripe:gtmrecruiteramerfixedterm",
+    "openai:infrastructuresourcingoperationslead",
+    "coinbase:seniorsourcinganalyst",
+    "coinbase:principalrecruiter",
+    "coinbase:seniorrecruiter",
+    "linear:technicalrecruiter"
+  ]
 }
