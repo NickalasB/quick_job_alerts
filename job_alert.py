@@ -48,11 +48,16 @@ ROLE_QUERIES = ["recruiting", "recruiter", "talent acquisition"]
 
 # Client-side filters applied on top of the API results, since Adzuna's
 # search is fuzzy. This is where the real precision comes from.
-LEVEL_PATTERN = re.compile(
-    r"\b(director|dir\.?|vp|vice president|head of|senior|sr\.?|lead)\b", re.I
-)
+#
+# No level/seniority requirement here on purpose: Director, Principal,
+# Staff, Manager, Senior, and plain "Recruiter" titles are all acceptable,
+# so requiring a level word only narrows results without adding value.
+# The $100k salary floor (via MIN_SALARY / Adzuna's salary_min param) does
+# the seniority filtering instead, plus EXCLUDE_PATTERN below for clearly
+# entry-level titles.
 ROLE_PATTERN = re.compile(
-    r"\b(recruit(er|ing|ment)?|talent acquisition|talent partner|talent advisor)\b",
+    r"\b(recruit(er|ing|ment)?|talent\s*acquisition|talent\s*partner|"
+    r"talent\s*advisor|sourcer|sourcing)\b",
     re.I,
 )
 EXCLUDE_PATTERN = re.compile(
@@ -60,6 +65,7 @@ EXCLUDE_PATTERN = re.compile(
     r"admin(istrative)?|scheduler)\b",
     re.I,
 )
+MIN_SALARY = 100000
 REMOTE_PATTERN = re.compile(r"\bremote\b", re.I)
 
 # Portland-metro suburbs/cities that a job board might list instead of
@@ -94,6 +100,7 @@ def adzuna_search(what: str, page: int = 1) -> list[dict]:
         "results_per_page": RESULTS_PER_PAGE,
         "what": what,
         "max_days_old": MAX_DAYS_OLD,
+        "salary_min": MIN_SALARY,
         "sort_by": "date",
         "content-type": "application/json",
     }
@@ -110,7 +117,7 @@ def passes_filters(job: dict) -> bool:
 
     if EXCLUDE_PATTERN.search(title):
         return False
-    if not (LEVEL_PATTERN.search(title) and ROLE_PATTERN.search(title)):
+    if not ROLE_PATTERN.search(title):
         return False
 
     is_portland = bool(PORTLAND_METRO_PATTERN.search(location))
