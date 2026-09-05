@@ -34,9 +34,11 @@ NTFY_SERVER = os.environ.get("NTFY_SERVER", "https://ntfy.sh")
 COUNTRY = "us"
 SEEN_JOBS_FILE = Path(__file__).parent / "seen_jobs.json"
 
-# How far back to look for postings (days). Keep small since this runs
-# frequently; it's a safety net against missed runs, not the primary filter.
-MAX_DAYS_OLD = 3
+# How far back to look for postings (days). Kept modest since this runs
+# frequently and sorts by date — a safety net against missed runs, not the
+# primary filter. Raised from 3 to 7 for more headroom while we're
+# validating the filters are working as expected.
+MAX_DAYS_OLD = 7
 
 # Separate searches, one per role concept. Adzuna's documented "what" param
 # ANDs together every word in the string, so a single combined query like
@@ -100,7 +102,6 @@ def adzuna_search(what: str, page: int = 1) -> list[dict]:
         "results_per_page": RESULTS_PER_PAGE,
         "what": what,
         "max_days_old": MAX_DAYS_OLD,
-        "salary_min": MIN_SALARY,
         "sort_by": "date",
         "content-type": "application/json",
     }
@@ -118,6 +119,16 @@ def passes_filters(job: dict) -> bool:
     if EXCLUDE_PATTERN.search(title):
         return False
     if not ROLE_PATTERN.search(title):
+        return False
+
+    # Soft salary filter: only reject a job if it HAS salary data and that
+    # data is clearly below the floor. A huge share of postings don't list
+    # a salary at all — excluding those outright (e.g. via Adzuna's
+    # server-side salary_min param) starves the results to almost nothing.
+    salary_max = job.get("salary_max")
+    salary_min = job.get("salary_min")
+    best_salary_signal = salary_max or salary_min
+    if best_salary_signal is not None and best_salary_signal < MIN_SALARY:
         return False
 
     is_portland = bool(PORTLAND_METRO_PATTERN.search(location))
