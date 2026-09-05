@@ -59,7 +59,9 @@ ROLE_QUERIES = ["recruiting", "recruiter", "talent acquisition"]
 # entry-level titles.
 ROLE_PATTERN = re.compile(
     r"\b(recruit(er|ing|ment)?|talent\s*acquisition|talent\s*partner|"
-    r"talent\s*advisor|sourcer|sourcing)\b",
+    r"talent\s*advisor|sourcer|sourcing|head\s+of\s+talent|"
+    r"vp\s+talent|vice\s+president\s*,?\s+talent|"
+    r"chief\s+talent\s+officer|people\s+acquisition)\b",
     re.I,
 )
 EXCLUDE_PATTERN = re.compile(
