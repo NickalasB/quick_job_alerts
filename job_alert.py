@@ -601,32 +601,45 @@ def main() -> int:
         print("ERROR: NTFY_TOPIC not set.", file=sys.stderr)
         return 1
 
+    # One-time override: when set, every currently-matching job gets
+    # notified regardless of seen/baseline state -- useful right after
+    # adding a big batch of new companies when you want visibility into
+    # everything open *right now*, not just what posts from here on.
+    # Normal scheduled runs should NOT set this.
+    notify_all = os.environ.get("NOTIFY_ALL", "").lower() == "true"
+
     seen_uids, seen_fingerprints = load_seen()
     matches = collect_matches()
 
-    # Companies whose direct-board results we've never seen before (i.e.
-    # this is the first run since they were added to TARGET_COMPANIES).
-    # Greenhouse/Lever/Ashby return ALL currently open roles, not just
-    # recent ones, so treating every match from a brand-new company as
-    # "new" would fire a burst of alerts for postings that may have been
-    # up for weeks. Instead, silently baseline-seed a new company's first
-    # batch of matches (mark as seen, no notification) -- anything posted
-    # after that baseline will alert normally on a future run.
-    existing_company_prefixes = {
-        p for uid in seen_uids if (p := company_prefix(uid))
-    }
+    if notify_all:
+        print("\nNOTIFY_ALL is set -- alerting on every current match, "
+              "ignoring seen/baseline state.")
+        new_matches = matches
+        baseline_seeded = []
+    else:
+        # Companies whose direct-board results we've never seen before (i.e.
+        # this is the first run since they were added to TARGET_COMPANIES).
+        # Greenhouse/Lever/Ashby return ALL currently open roles, not just
+        # recent ones, so treating every match from a brand-new company as
+        # "new" would fire a burst of alerts for postings that may have been
+        # up for weeks. Instead, silently baseline-seed a new company's first
+        # batch of matches (mark as seen, no notification) -- anything posted
+        # after that baseline will alert normally on a future run.
+        existing_company_prefixes = {
+            p for uid in seen_uids if (p := company_prefix(uid))
+        }
 
-    new_matches = []
-    baseline_seeded = []
-    for job in matches:
-        fp = fingerprint(job)
-        if job["uid"] in seen_uids or fp in seen_fingerprints:
-            continue
-        prefix = company_prefix(job["uid"])
-        if prefix and prefix not in existing_company_prefixes:
-            baseline_seeded.append(job)
-        else:
-            new_matches.append(job)
+        new_matches = []
+        baseline_seeded = []
+        for job in matches:
+            fp = fingerprint(job)
+            if job["uid"] in seen_uids or fp in seen_fingerprints:
+                continue
+            prefix = company_prefix(job["uid"])
+            if prefix and prefix not in existing_company_prefixes:
+                baseline_seeded.append(job)
+            else:
+                new_matches.append(job)
 
     print(f"\nFound {len(matches)} matching jobs, {len(new_matches)} new.")
     if baseline_seeded:
