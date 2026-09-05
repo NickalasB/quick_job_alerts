@@ -49,7 +49,7 @@ ROLE_QUERIES = ["recruiting", "recruiter", "talent acquisition"]
 # Client-side filters applied on top of the API results, since Adzuna's
 # search is fuzzy. This is where the real precision comes from.
 LEVEL_PATTERN = re.compile(
-    r"\b(director|dir\.?|vp|vice president|head of|senior|sr\.?)\b", re.I
+    r"\b(director|dir\.?|vp|vice president|head of|senior|sr\.?|lead)\b", re.I
 )
 ROLE_PATTERN = re.compile(
     r"\b(recruit(er|ing|ment)?|talent acquisition|talent partner|talent advisor)\b",
@@ -61,6 +61,14 @@ EXCLUDE_PATTERN = re.compile(
     re.I,
 )
 REMOTE_PATTERN = re.compile(r"\bremote\b", re.I)
+
+# Portland-metro suburbs/cities that a job board might list instead of
+# "Portland" itself, but that are effectively the same commute area.
+PORTLAND_METRO_PATTERN = re.compile(
+    r"\b(portland|beaverton|hillsboro|tigard|lake oswego|tualatin|"
+    r"wilsonville|gresham|milwaukie|oregon city|clackamas|vancouver,?\s*wa)\b",
+    re.I,
+)
 
 RESULTS_PER_PAGE = 50
 
@@ -105,7 +113,7 @@ def passes_filters(job: dict) -> bool:
     if not (LEVEL_PATTERN.search(title) and ROLE_PATTERN.search(title)):
         return False
 
-    is_portland = "portland" in location.lower()
+    is_portland = bool(PORTLAND_METRO_PATTERN.search(location))
     is_remote = bool(
         REMOTE_PATTERN.search(title)
         or REMOTE_PATTERN.search(location)
