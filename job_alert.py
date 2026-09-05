@@ -106,9 +106,24 @@ def adzuna_search(what: str, page: int = 1) -> list[dict]:
         "content-type": "application/json",
     }
 
-    resp = requests.get(url, params=params, timeout=30)
-    resp.raise_for_status()
-    return resp.json().get("results", [])
+    try:
+        resp = requests.get(url, params=params, timeout=30)
+    except requests.RequestException as e:
+        print(f"  [{what!r}] request failed: {e}", file=sys.stderr)
+        return []
+
+    if resp.status_code != 200:
+        # Print the body (minus anything sensitive) so auth/param errors
+        # are visible in the Actions log instead of silently returning [].
+        print(
+            f"  [{what!r}] HTTP {resp.status_code}: {resp.text[:500]}",
+            file=sys.stderr,
+        )
+        return []
+
+    results = resp.json().get("results", [])
+    print(f"  [{what!r}] raw results from Adzuna: {len(results)}")
+    return results
 
 
 def passes_filters(job: dict) -> bool:
@@ -142,10 +157,40 @@ def passes_filters(job: dict) -> bool:
 
 def collect_matches() -> list[dict]:
     matches = {}
+    all_raw_jobs = []
     for query in ROLE_QUERIES:
-        for job in adzuna_search(what=query):
+        print(f"Searching Adzuna for {query!r}...")
+        raw = adzuna_search(what=query)
+        all_raw_jobs.extend(raw)
+        for job in raw:
             if passes_filters(job):
                 matches[job["id"]] = job
+
+    if not matches and all_raw_jobs:
+        # We got jobs back from Adzuna, but none survived filtering.
+        # Print a sample so it's obvious *why* on the next run, instead of
+        # just seeing "0 matching jobs" with no way to tell what happened.
+        print(
+            f"\nNo jobs passed filters, but {len(all_raw_jobs)} raw results "
+            f"came back. Sample of what Adzuna returned (unfiltered):"
+        )
+        for job in all_raw_jobs[:10]:
+            title = job.get("title", "")
+            location = (job.get("location") or {}).get("display_name", "")
+            salary_max = job.get("salary_max")
+            salary_min = job.get("salary_min")
+            print(
+                f"  - {title!r} | {location!r} | "
+                f"salary_min={salary_min} salary_max={salary_max}"
+            )
+    elif not all_raw_jobs:
+        print(
+            "\nAdzuna returned 0 raw results for every query. This usually "
+            "means an API problem (bad credentials, wrong parameter, or "
+            "hitting the daily call limit) rather than a filtering issue "
+            "-- check for HTTP error lines above."
+        )
+
     return list(matches.values())
 
 
