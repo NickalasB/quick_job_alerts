@@ -72,6 +72,65 @@ TARGET_COMPANIES = [
     ("Wolt", "greenhouse", "wolt"),
     ("Canonical", "greenhouse", "canonical"),
     ("ClickUp", "ashby", "clickup"),
+    # Round 2 (broad remote-friendly tech, confirmed via discover_ats.py)
+    ("Stripe", "greenhouse", "stripe"),
+    ("Airbnb", "greenhouse", "airbnb"),
+    ("GitLab", "greenhouse", "gitlab"),
+    ("Coinbase", "greenhouse", "coinbase"),
+    ("Robinhood", "greenhouse", "robinhood"),
+    ("Instacart", "greenhouse", "instacart"),
+    ("Pinterest", "greenhouse", "pinterest"),
+    ("Lyft", "greenhouse", "lyft"),
+    ("Discord", "greenhouse", "discord"),
+    ("Spotify", "lever", "spotify"),
+    ("Palantir", "lever", "palantir"),
+    ("Notion", "ashby", "notion"),
+    ("Ramp", "ashby", "ramp"),
+    ("Linear", "ashby", "linear"),
+    ("OpenAI", "ashby", "openai"),
+    ("Figma", "greenhouse", "figma"),
+    ("Vercel", "greenhouse", "vercel"),
+    ("Posthog", "ashby", "posthog"),
+    ("Plaid", "ashby", "plaid"),
+    ("Brex", "greenhouse", "brex"),
+    ("Affirm", "greenhouse", "affirm"),
+    ("Chime", "greenhouse", "chime"),
+    ("Toast", "greenhouse", "toast"),
+    ("Klaviyo", "greenhouse", "klaviyo"),
+    ("Elastic", "greenhouse", "elastic"),
+    ("Datadog", "greenhouse", "datadog"),
+    ("PagerDuty", "greenhouse", "pagerduty"),
+    ("CircleCI", "greenhouse", "circleci"),
+    ("Sentry", "ashby", "sentry"),
+    ("LaunchDarkly", "greenhouse", "launchdarkly"),
+    ("Postman", "greenhouse", "postman"),
+    ("Netlify", "greenhouse", "netlify"),
+    ("MongoDB", "greenhouse", "mongodb"),
+    ("Confluent", "ashby", "confluent"),
+    ("Snowflake", "ashby", "snowflake"),
+    ("Databricks", "greenhouse", "databricks"),
+    ("Cloudflare", "greenhouse", "cloudflare"),
+    ("Fastly", "greenhouse", "fastly"),
+    ("1Password", "ashby", "1password"),
+    ("Okta", "greenhouse", "okta"),
+    ("Zapier", "ashby", "zapier"),
+    ("Buffer", "ashby", "buffer"),
+    ("Airtable", "greenhouse", "airtable"),
+    ("Miro", "ashby", "miro"),
+    ("Calendly", "greenhouse", "calendly"),
+    ("Asana", "greenhouse", "asana"),
+    ("Webflow", "greenhouse", "webflow"),
+    ("Squarespace", "greenhouse", "squarespace"),
+    ("Braze", "greenhouse", "braze"),
+    ("Amplitude", "greenhouse", "amplitude"),
+    ("Mixpanel", "greenhouse", "mixpanel"),
+    ("Intercom", "greenhouse", "intercom"),
+    ("Gusto", "greenhouse", "gusto"),
+    ("Reddit", "greenhouse", "reddit"),
+    ("Dropbox", "greenhouse", "dropbox"),
+    ("Duolingo", "greenhouse", "duolingo"),
+    ("Coursera", "greenhouse", "coursera"),
+    ("Udemy", "greenhouse", "udemy"),
 ]
 
 # Client-side filters applied on top of every source's results.
@@ -170,6 +229,16 @@ def fingerprint(job: dict) -> str:
     company = normalize_company(job["company"])
     title = re.sub(r"[^a-z0-9]", "", job["title"].lower())
     return f"{company}:{title}"
+
+
+def company_prefix(uid: str) -> str | None:
+    """Extract the 'source:slug:' prefix from a direct-company-board uid
+    (e.g. 'greenhouse:stripe:12345' -> 'greenhouse:stripe:'). Returns None
+    for Adzuna uids, which don't represent a single polled company."""
+    parts = uid.split(":")
+    if len(parts) >= 3 and parts[0] in ("greenhouse", "lever", "ashby"):
+        return f"{parts[0]}:{parts[1]}:"
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -535,14 +604,41 @@ def main() -> int:
     seen_uids, seen_fingerprints = load_seen()
     matches = collect_matches()
 
+    # Companies whose direct-board results we've never seen before (i.e.
+    # this is the first run since they were added to TARGET_COMPANIES).
+    # Greenhouse/Lever/Ashby return ALL currently open roles, not just
+    # recent ones, so treating every match from a brand-new company as
+    # "new" would fire a burst of alerts for postings that may have been
+    # up for weeks. Instead, silently baseline-seed a new company's first
+    # batch of matches (mark as seen, no notification) -- anything posted
+    # after that baseline will alert normally on a future run.
+    existing_company_prefixes = {
+        p for uid in seen_uids if (p := company_prefix(uid))
+    }
+
     new_matches = []
+    baseline_seeded = []
     for job in matches:
         fp = fingerprint(job)
         if job["uid"] in seen_uids or fp in seen_fingerprints:
             continue
-        new_matches.append(job)
+        prefix = company_prefix(job["uid"])
+        if prefix and prefix not in existing_company_prefixes:
+            baseline_seeded.append(job)
+        else:
+            new_matches.append(job)
 
     print(f"\nFound {len(matches)} matching jobs, {len(new_matches)} new.")
+    if baseline_seeded:
+        seeded_companies = sorted({j["company"] for j in baseline_seeded})
+        print(
+            f"Baseline-seeding {len(baseline_seeded)} jobs across "
+            f"{len(seeded_companies)} newly added companies (no alerts sent "
+            f"for this initial batch): {', '.join(seeded_companies)}"
+        )
+        for job in baseline_seeded:
+            seen_uids.add(job["uid"])
+            seen_fingerprints.add(fingerprint(job))
 
     for job in new_matches:
         try:
