@@ -1,0 +1,26 @@
+name: Discover ATS platforms (one-time)
+
+# Manual trigger only -- this is a one-off research tool, not part of the
+# recurring job-alert schedule. Run it from the Actions tab whenever you
+# want to (re-)check which watch-list companies run on Greenhouse, Lever,
+# or Ashby.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run discovery
+        run: python discover_ats.py
