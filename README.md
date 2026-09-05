@@ -47,16 +47,22 @@ every 15 minutes.
 ## Tuning it
 
 Open `job_alert.py`:
-- `ROLE_TERMS` / `LEVEL_PATTERN` / `ROLE_PATTERN` / `EXCLUDE_PATTERN` — adjust
-  which titles count as a match.
-- `MAX_DAYS_OLD` — how far back Adzuna looks each run (kept small since this
-  runs frequently).
-- `PORTLAND_DISTANCE_MILES` — radius around Portland to include.
+- `ROLE_TERMS` / `ROLE_PATTERN` / `EXCLUDE_PATTERN` — adjust which titles count as a match.
+- `MIN_SALARY` — the $100k floor. Jobs with no listed salary still pass; only jobs with a *reported* salary below this are excluded.
+- `MAX_DAYS_OLD` — how far back Adzuna looks each run.
+- `TARGET_COMPANIES` — the list of companies polled directly via Greenhouse/Lever/Ashby (see below). Add a new one as `("Company Name", "greenhouse"|"lever"|"ashby", "board-slug")`.
 
-## Known limitation
+## Adding more target companies
 
-Adzuna doesn't tag postings by "is this a tech company," only by job
-category — and recruiting roles get filed under HR regardless of the
-company's industry. So you'll get some non-tech companies in the mix; the
-title/location filtering handles the rest of the precision. If this gets
-noisy, tell me and I'll add a company-name allow/block-list layer.
+`discover_ats.py` is a one-time (or occasional) tool, separate from the main scheduled job. It tests a list of company names directly against the real Greenhouse/Lever/Ashby APIs to see which ones actually run on those platforms — far more reliable than guessing from a company's public-facing careers page, since many companies proxy one of these ATSs under a custom-branded URL.
+
+To check more companies:
+1. Add names to the `COMPANIES` list in `discover_ats.py`.
+2. Run it manually: **Actions → "Discover ATS platforms (one-time)" → Run workflow**.
+3. Copy any new lines from "CONFIRMED MATCHES" into `TARGET_COMPANIES` in `job_alert.py`.
+
+## Known limitations
+
+- Adzuna doesn't tag postings by "is this a tech company," only by job category — recruiting roles get filed under HR regardless of industry. Title/location filtering handles most of the precision instead.
+- The direct-company remote check doesn't verify the role is *US*-remote specifically — a company with international Ashby/Lever/Greenhouse postings marked "remote" could occasionally surface a non-US role.
+- Not every company can be covered this way. Most large multinationals (the ones with the biggest published Flutter case studies, coincidentally) run on enterprise HR platforms like Workday, which don't expose a public API the way Greenhouse/Lever/Ashby do. For those, Adzuna's broader crawl and your wife's own LinkedIn job alerts remain the way to catch postings.
