@@ -38,8 +38,13 @@ SEEN_JOBS_FILE = Path(__file__).parent / "seen_jobs.json"
 # frequently; it's a safety net against missed runs, not the primary filter.
 MAX_DAYS_OLD = 3
 
-# Role terms we search for in the job title (Adzuna "what_or", title-only).
-ROLE_TERMS = "recruiter recruiting talent acquisition"
+# Separate searches, one per role concept. Adzuna's documented "what" param
+# ANDs together every word in the string, so a single combined query like
+# "recruiter recruiting talent acquisition" would require ALL of those words
+# in one listing and return nothing. Running one simple, well-documented
+# "what" query per phrase and merging results client-side is more reliable
+# than depending on undocumented OR-style parameters.
+ROLE_QUERIES = ["recruiting", "recruiter", "talent acquisition"]
 
 # Client-side filters applied on top of the API results, since Adzuna's
 # search is fuzzy. This is where the real precision comes from.
@@ -57,9 +62,6 @@ EXCLUDE_PATTERN = re.compile(
 )
 REMOTE_PATTERN = re.compile(r"\bremote\b", re.I)
 
-PORTLAND_LOCATION = "Portland, OR"
-PORTLAND_DISTANCE_MILES = 25
-
 RESULTS_PER_PAGE = 50
 
 
@@ -67,29 +69,33 @@ RESULTS_PER_PAGE = 50
 # Adzuna search
 # ---------------------------------------------------------------------------
 
-def adzuna_search(where: str | None, page: int = 1) -> list[dict]:
-    """Run one Adzuna title-only search for our role terms."""
+def adzuna_search(what: str, page: int = 1) -> list[dict]:
+    """Run one Adzuna search for a single role phrase, nationwide.
+
+    We search nationwide (no "where") rather than splitting into a
+    Portland-specific call and a remote-specific call: Portland postings
+    still show up in a nationwide search, and this halves the number of
+    API calls, which matters for staying under Adzuna's free-tier daily cap.
+    Location precision (Portland vs. remote) is enforced client-side in
+    passes_filters().
+    """
     url = f"https://api.adzuna.com/v1/api/jobs/{COUNTRY}/search/{page}"
     params = {
         "app_id": ADZUNA_APP_ID,
         "app_key": ADZUNA_APP_KEY,
         "results_per_page": RESULTS_PER_PAGE,
-        "what_or": ROLE_TERMS,
-        "title_only": ROLE_TERMS,
+        "what": what,
         "max_days_old": MAX_DAYS_OLD,
         "sort_by": "date",
         "content-type": "application/json",
     }
-    if where:
-        params["where"] = where
-        params["distance"] = PORTLAND_DISTANCE_MILES
 
     resp = requests.get(url, params=params, timeout=30)
     resp.raise_for_status()
     return resp.json().get("results", [])
 
 
-def passes_filters(job: dict, require_remote_or_portland: bool) -> bool:
+def passes_filters(job: dict) -> bool:
     title = job.get("title", "")
     description = job.get("description", "")
     location = (job.get("location") or {}).get("display_name", "")
@@ -99,34 +105,21 @@ def passes_filters(job: dict, require_remote_or_portland: bool) -> bool:
     if not (LEVEL_PATTERN.search(title) and ROLE_PATTERN.search(title)):
         return False
 
-    if require_remote_or_portland:
-        is_portland = "portland" in location.lower()
-        is_remote = bool(
-            REMOTE_PATTERN.search(title)
-            or REMOTE_PATTERN.search(location)
-            or REMOTE_PATTERN.search(description[:500])
-        )
-        if not (is_portland or is_remote):
-            return False
-
-    return True
+    is_portland = "portland" in location.lower()
+    is_remote = bool(
+        REMOTE_PATTERN.search(title)
+        or REMOTE_PATTERN.search(location)
+        or REMOTE_PATTERN.search(description[:500])
+    )
+    return is_portland or is_remote
 
 
 def collect_matches() -> list[dict]:
     matches = {}
-
-    # Search 1: anchored on Portland, OR (catches on-site/hybrid roles that
-    # don't say "remote" anywhere).
-    for job in adzuna_search(where=PORTLAND_LOCATION):
-        if passes_filters(job, require_remote_or_portland=False):
-            matches[job["id"]] = job
-
-    # Search 2: nationwide, then require "remote" signal client-side
-    # (Adzuna doesn't have a reliable remote-only flag).
-    for job in adzuna_search(where=None):
-        if passes_filters(job, require_remote_or_portland=True):
-            matches[job["id"]] = job
-
+    for query in ROLE_QUERIES:
+        for job in adzuna_search(what=query):
+            if passes_filters(job):
+                matches[job["id"]] = job
     return list(matches.values())
 
 
