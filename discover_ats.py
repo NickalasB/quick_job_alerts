@@ -20,28 +20,41 @@ import re
 import time
 import requests
 
-# Companies from the Flutter-adoption watch list. Where a name has a
-# parenthetical or slash-separated alternate (e.g. "Kijiji (eBay Canada)",
-# "Square (Block)"), both parts are tried as separate slug candidates.
+# Round 2: a broad, hand-picked set of prominent tech companies known for
+# remote-friendly or remote-first policies, spanning many disciplines
+# (fintech, dev tools, security, productivity SaaS, infra, consumer) --
+# not tied to any particular technology, since her recruiting background
+# spans tech generally. Round 1 (the Flutter-adoption list) already ran;
+# its confirmed matches are wired into job_alert.py's TARGET_COMPANIES.
 COMPANIES = [
-    "Alibaba", "Xianyu", "Beike", "Wendy's", "Kijiji", "eBay Canada",
-    "talabat", "Karaca", "Blue Bottle Coffee", "Caribou Coffee",
-    "Dutch Bros", "eBay Motors", "Etsy", "Keller Williams", "QuintoAndar",
-    "Scotts Miracle-Gro", "SHEIN", "ROMWE", "SKIMS", "Whirlpool",
-    "Nubank", "Google Pay", "Betterment", "SoFi", "GEICO",
-    "Amica Insurance", "Credit Agricole", "Nationwide", "Skandia",
-    "Square", "Block", "Tamara", "Tide", "Virgin Money", "Visa",
-    "BMW", "AutoNation", "Kakao Mobility", "Lucid Motors", "Toyota",
-    "Volkswagen", "MOIA", "Xiaomi",
-    "PUBG Mobile", "Headspace", "Dream11", "Universal Studios",
-    "MGM Resorts", "Abbey Road Studios", "ByteDance", "Comcast",
-    "Couchsurfing", "DraftKings", "Hamilton", "KQED", "PGA of America",
-    "Sky", "Supercell", "Tencent",
-    "CVS Health", "SNCF Connect", "LG Electronics", "Knowunity", "Blade",
-    "GE Appliances", "JSX", "Norwegian Cruise Line", "NotebookLM",
-    "Philips Hue", "Tonal",
-    "Google", "Grab", "Wolt", "DoorDash", "ADT", "Canonical", "Ubuntu",
-    "ClickUp", "FedEx ShopRunner", "Nestle", "Zoho",
+    # Directly referenced elsewhere as running one of these platforms --
+    # still verified here rather than assumed.
+    "Stripe", "Airbnb", "GitLab", "Coinbase", "Robinhood", "Instacart",
+    "Pinterest", "Lyft", "Discord", "Spotify", "Palantir", "Notion",
+    "Ramp", "Linear", "OpenAI", "Figma", "Vercel", "Posthog",
+    # Fintech
+    "Plaid", "Brex", "Affirm", "Chime", "Marqeta", "Toast", "Klaviyo",
+    "Chainalysis",
+    # Dev tools / infrastructure
+    "HashiCorp", "Elastic", "Datadog", "PagerDuty", "CircleCI", "Sentry",
+    "LaunchDarkly", "Postman", "Retool", "Netlify", "MongoDB",
+    "Confluent", "Snowflake", "Databricks", "DigitalOcean", "Cloudflare",
+    "Fastly",
+    # Security
+    "CrowdStrike", "SentinelOne", "Snyk", "1Password", "Okta",
+    # Productivity / SaaS
+    "Zapier", "Doist", "Buffer", "Automattic", "Airtable", "Miro",
+    "Loom", "Calendly", "monday.com", "Asana", "Webflow", "Squarespace",
+    "Grammarly",
+    # Marketing / customer engagement
+    "Braze", "Amplitude", "Mixpanel", "Segment", "Intercom", "Zendesk",
+    "HubSpot",
+    # People / HR tech (recruiter-to-recruiter irony intended)
+    "Deel", "Rippling", "Gusto",
+    # Consumer / social
+    "Reddit", "Dropbox", "Atlassian",
+    # Education
+    "Duolingo", "Coursera", "Udemy",
 ]
 
 GREENHOUSE_URL = "https://boards-api.greenhouse.io/v1/boards/{slug}/jobs"
