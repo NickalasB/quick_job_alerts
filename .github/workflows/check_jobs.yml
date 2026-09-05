@@ -22,20 +22,33 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Resolve project paths
+        run: |
+          if [[ -f requirements.txt && -f job_alert.py && -f seen_jobs.json ]]; then
+            echo "PROJECT_DIR=." >> "$GITHUB_ENV"
+            echo "SEEN_JOBS_FILE=seen_jobs.json" >> "$GITHUB_ENV"
+          elif [[ -f .github/requirements.txt && -f .github/job_alert.py && -f .github/seen_jobs.json ]]; then
+            echo "PROJECT_DIR=.github" >> "$GITHUB_ENV"
+            echo "SEEN_JOBS_FILE=.github/seen_jobs.json" >> "$GITHUB_ENV"
+          else
+            echo "Could not find job alert files in either the repository root or .github/." >&2
+            exit 1
+          fi
+
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r "$PROJECT_DIR/requirements.txt"
 
       - name: Run job checker
         env:
           ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
           ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: python job_alert.py
+        run: python "$PROJECT_DIR/job_alert.py"
 
       - name: Commit updated seen_jobs.json
         run: |
           git config user.name "job-alert-bot"
           git config user.email "actions@github.com"
-          git add seen_jobs.json
+          git add "$SEEN_JOBS_FILE"
           git diff --quiet --cached || git commit -m "Update seen jobs [skip ci]"
           git push
