@@ -1,0 +1,55 @@
+name: Check for new PM jobs
+
+on:
+  schedule:
+    # Every 30 minutes, offset from the recruiting workflow (:00/:20/:40).
+    # 3 Adzuna calls per run x 48 runs/day = 144 calls/day.
+    - cron: "5,35 * * * *"
+  workflow_dispatch:
+    inputs:
+      notify_all:
+        description: "Alert on EVERY currently-open matching job, ignoring history (can send a lot of notifications)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write  # needed so the workflow can commit seen_jobs_pm.json back
+
+# Both job-alert workflows commit a state file to this repo. Sharing one
+# concurrency group makes them take turns, so neither can reject or overwrite
+# the other's commit.
+concurrency:
+  group: job-alert-state
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run PM job checker
+        env:
+          ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+          ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          PM_NTFY_TOPIC: ${{ secrets.PM_NTFY_TOPIC }}
+          NOTIFY_ALL: ${{ github.event.inputs.notify_all }}
+        run: python pm_job_alert.py
+
+      - name: Commit updated seen_jobs_pm.json
+        run: |
+          git config user.name "job-alert-bot"
+          git config user.email "actions@github.com"
+          git add seen_jobs_pm.json
+          git diff --quiet --cached || git commit -m "Update PM seen jobs [skip ci]"
+          git push
