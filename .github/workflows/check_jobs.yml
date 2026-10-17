@@ -17,6 +17,10 @@ on:
 permissions:
   contents: write  # needed so the workflow can commit seen_jobs.json back
 
+concurrency:
+  group: job-alert-state
+  cancel-in-progress: false
+  
 jobs:
   check:
     runs-on: ubuntu-latest
